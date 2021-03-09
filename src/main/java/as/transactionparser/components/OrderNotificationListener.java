@@ -1,8 +1,6 @@
-package as.transactionparser.configuration;
+package as.transactionparser.components;
 
 import as.transactionparser.dao.entity.Order;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.batch.core.BatchStatus;
 import org.springframework.batch.core.JobExecution;
 import org.springframework.batch.core.listener.JobExecutionListenerSupport;
@@ -10,7 +8,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
 
-import javax.management.NotificationListener;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -18,7 +15,6 @@ import java.util.List;
 public class OrderNotificationListener extends JobExecutionListenerSupport {
 
     private final JdbcTemplate jdbcTemplate;
-    private static final Logger LOGGER = LoggerFactory.getLogger(NotificationListener.class);
     private List<Order> list = new ArrayList<>();
 
     @Autowired

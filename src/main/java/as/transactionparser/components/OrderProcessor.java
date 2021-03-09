@@ -1,4 +1,4 @@
-package as.transactionparser.configuration;
+package as.transactionparser.components;
 
 import as.transactionparser.dao.entity.Order;
 import org.springframework.batch.item.ItemProcessor;
