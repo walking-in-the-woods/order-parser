@@ -1,10 +1,7 @@
 package as.transactionparser.configuration;
 
-import as.transactionparser.components.OrderNotificationListener;
-import as.transactionparser.components.OrderProcessor;
-import as.transactionparser.dao.entity.Order;
-import as.transactionparser.services.CsvReaderConfig;
-import as.transactionparser.services.JsonReaderConfig;
+import as.transactionparser.domain.Order;
+import as.transactionparser.domain.OrderFieldSetMapper;
 import org.springframework.batch.core.Job;
 import org.springframework.batch.core.Step;
 import org.springframework.batch.core.configuration.annotation.EnableBatchProcessing;
@@ -12,23 +9,21 @@ import org.springframework.batch.core.configuration.annotation.JobBuilderFactory
 import org.springframework.batch.core.configuration.annotation.StepBuilderFactory;
 import org.springframework.batch.core.job.builder.FlowBuilder;
 import org.springframework.batch.core.job.flow.Flow;
-import org.springframework.batch.core.launch.support.RunIdIncrementer;
-import org.springframework.batch.core.step.tasklet.TaskletStep;
-import org.springframework.batch.item.database.BeanPropertyItemSqlParameterSourceProvider;
-import org.springframework.batch.item.database.JdbcBatchItemWriter;
-import org.springframework.batch.item.database.builder.JdbcBatchItemWriterBuilder;
-import org.springframework.batch.repeat.RepeatStatus;
+import org.springframework.batch.item.ItemWriter;
+import org.springframework.batch.item.file.FlatFileItemReader;
+import org.springframework.batch.item.file.mapping.DefaultLineMapper;
+import org.springframework.batch.item.file.transform.DelimitedLineTokenizer;
+import org.springframework.batch.item.json.JacksonJsonObjectReader;
+import org.springframework.batch.item.json.JsonItemReader;
+import org.springframework.batch.item.json.builder.JsonItemReaderBuilder;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.context.annotation.Import;
+import org.springframework.core.io.ClassPathResource;
 import org.springframework.core.task.SimpleAsyncTaskExecutor;
-
-import javax.sql.DataSource;
 
 @Configuration
 @EnableBatchProcessing
-@Import({CsvReaderConfig.class, JsonReaderConfig.class})
 public class BatchConfiguration {
 
     @Autowired
@@ -37,68 +32,73 @@ public class BatchConfiguration {
     @Autowired
     public StepBuilderFactory stepBuilderFactory;
 
-    private CsvReaderConfig csvReaderConfig = new CsvReaderConfig();
-    private JsonReaderConfig jsonReaderConfig = new JsonReaderConfig();
-
     @Bean
-    public OrderProcessor processor() {
-        return new OrderProcessor();
+    public FlatFileItemReader<Order> csvItemReader() {
+        FlatFileItemReader<Order> reader = new FlatFileItemReader<>();
+
+        reader.setLinesToSkip(1);
+        reader.setResource(new ClassPathResource("/data/input.csv"));
+
+        DefaultLineMapper<Order> orderLineMapper = new DefaultLineMapper<>();
+
+        DelimitedLineTokenizer tokenizer = new DelimitedLineTokenizer();
+        tokenizer.setNames(new String[] {"id", "amount", "currency", "comment"});
+
+        orderLineMapper.setLineTokenizer(tokenizer);
+        orderLineMapper.setFieldSetMapper(new OrderFieldSetMapper());
+        orderLineMapper.afterPropertiesSet();
+
+        reader.setLineMapper(orderLineMapper);
+
+        return reader;
     }
 
-    @Bean
-    public JdbcBatchItemWriter<Order> writer(final DataSource dataSource) {
-        return new JdbcBatchItemWriterBuilder<Order>()
-                .itemSqlParameterSourceProvider(new BeanPropertyItemSqlParameterSourceProvider<>())
-                .sql("INSERT INTO order_table (id, amount, currency, comment, filename, line)" +
-                        "VALUES (:id, :amount, :currency, :comment, :filename, :line)")
-                .dataSource(dataSource)
+    public JsonItemReader<Order> jsonItemReader() {
+        return new JsonItemReaderBuilder<Order>()
+                .jsonObjectReader(new JacksonJsonObjectReader<>(Order.class))
+                .resource(new ClassPathResource("/data/input.json"))
+                .name("jsonItemReader")
                 .build();
     }
 
     @Bean
-    public Job parallelStepsJob(OrderNotificationListener listener) {
-
-        Flow masterFlow = new FlowBuilder<Flow>("masterFlow").start(taskletStep("step1")).build();
-
-        Flow csvFlow = (Flow) new FlowBuilder("csvFlow").start(taskletStep("csvStep")).build();
-        Flow jsonFlow = (Flow) new FlowBuilder("jsonFlow").start(taskletStep("jsonStep")).build();
-
-        Flow slaveFlow = new FlowBuilder<Flow>("splitflow")
-                .split(new SimpleAsyncTaskExecutor()).add(csvFlow, jsonFlow).build();
-
-        return (jobBuilderFactory.get("parallelFlowJob")
-                .incrementer(new RunIdIncrementer())
-                .listener(listener)
-                .start(masterFlow)
-                .next(slaveFlow)
-                .build()).build();
-
+    public ItemWriter<Order> orderItemWriter() {
+        return items -> {
+            for (Order item : items) {
+                System.out.println(item.toString());
+            }
+        };
     }
 
-    private TaskletStep taskletStep(String step) {
-        return stepBuilderFactory.get(step).tasklet((contribution, chunkContext) -> {
-            return RepeatStatus.FINISHED;
-        }).build();
+    @Bean
+    public Job job() throws Exception {
+
+        Flow csvFlow = (Flow) new FlowBuilder("csvFlow").start(csvStep()).build();
+        Flow jsonFlow = (Flow) new FlowBuilder("jsonFlow").start(jsonStep()).build();
+
+        return jobBuilderFactory.get("job")
+                .start(csvFlow)
+                .split(new SimpleAsyncTaskExecutor())
+                .add(jsonFlow)
+                .end().build();
 
     }
 
     @Bean
-    public Step csvStep(JdbcBatchItemWriter<Order> writer) {
+    public Step csvStep() {
         return stepBuilderFactory.get("csvStep")
                 .<Order, Order> chunk(10)
-                .reader(csvReaderConfig.csvItemReader())
-                .processor(processor())
-                .writer(writer)
+                .reader(csvItemReader())
+                .writer(orderItemWriter())
                 .build();
     }
 
     @Bean
-    public Step jsonStep(JdbcBatchItemWriter<Order> writer) throws NoSuchMethodException {
+    public Step jsonStep() throws NoSuchMethodException {
         return stepBuilderFactory.get("jsonStep")
                 .<Order, Order> chunk(10)
-                .reader(jsonReaderConfig.jsonItemReader())
-                .processor(processor())
-                .writer(writer)
+                .reader(jsonItemReader())
+                .writer(orderItemWriter())
                 .build();
     }
 }
