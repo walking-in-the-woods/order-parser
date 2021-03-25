@@ -2,6 +2,7 @@ package as.transactionparser.configuration;
 
 import as.transactionparser.domain.Order;
 import as.transactionparser.domain.OrderFieldSetMapper;
+import as.transactionparser.domain.ProcessedOrder;
 import org.springframework.batch.core.Job;
 import org.springframework.batch.core.Step;
 import org.springframework.batch.core.configuration.annotation.EnableBatchProcessing;
@@ -9,6 +10,7 @@ import org.springframework.batch.core.configuration.annotation.JobBuilderFactory
 import org.springframework.batch.core.configuration.annotation.StepBuilderFactory;
 import org.springframework.batch.core.job.builder.FlowBuilder;
 import org.springframework.batch.core.job.flow.Flow;
+import org.springframework.batch.item.ItemProcessor;
 import org.springframework.batch.item.ItemWriter;
 import org.springframework.batch.item.file.FlatFileItemReader;
 import org.springframework.batch.item.file.mapping.DefaultLineMapper;
@@ -16,11 +18,15 @@ import org.springframework.batch.item.file.transform.DelimitedLineTokenizer;
 import org.springframework.batch.item.json.JacksonJsonObjectReader;
 import org.springframework.batch.item.json.JsonItemReader;
 import org.springframework.batch.item.json.builder.JsonItemReaderBuilder;
+import org.springframework.beans.factory.BeanFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.core.task.SimpleAsyncTaskExecutor;
+
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 @Configuration
 @EnableBatchProcessing
@@ -32,12 +38,31 @@ public class BatchConfiguration {
     @Autowired
     public StepBuilderFactory stepBuilderFactory;
 
+    @Autowired
+    public BeanFactory beanFactory;
+
+    private final String csvSource = "/data/input.csv";
+    private final String jsonSource = "/data/input.json";
+    private final String csvRegex = "\\w+\\.csv";
+    private final String jsonRegex = "\\w+\\.json";
+
+    public static String extractFileName(String source, String regex) {
+        Pattern pattern = Pattern.compile(regex);
+        Matcher matcher = pattern.matcher(source);
+        matcher.reset();
+
+        if(matcher.find()) {
+            return matcher.group(0);
+        }
+        return null;
+    }
+
     @Bean
     public FlatFileItemReader<Order> csvItemReader() {
         FlatFileItemReader<Order> reader = new FlatFileItemReader<>();
 
         reader.setLinesToSkip(1);
-        reader.setResource(new ClassPathResource("/data/input.csv"));
+        reader.setResource(new ClassPathResource(csvSource));
 
         DefaultLineMapper<Order> orderLineMapper = new DefaultLineMapper<>();
 
@@ -53,18 +78,63 @@ public class BatchConfiguration {
         return reader;
     }
 
+    @Bean
     public JsonItemReader<Order> jsonItemReader() {
         return new JsonItemReaderBuilder<Order>()
                 .jsonObjectReader(new JacksonJsonObjectReader<>(Order.class))
-                .resource(new ClassPathResource("/data/input.json"))
+                .resource(new ClassPathResource(jsonSource))
                 .name("jsonItemReader")
                 .build();
     }
 
     @Bean
-    public ItemWriter<Order> orderItemWriter() {
+    public ItemProcessor csvItemProcessor() {
+        return new ItemProcessor<Order, ProcessedOrder>() {
+            int counter = 0;
+
+            @Override
+            public ProcessedOrder process(Order order) throws Exception {
+                ProcessedOrder processedOrder = new ProcessedOrder();
+
+                processedOrder.setOrderId(order.getOrderId());
+                processedOrder.setAmount(order.getAmount());
+                processedOrder.setCurrency(order.getCurrency());
+                processedOrder.setComment(order.getComment());
+                processedOrder.setFilename(extractFileName(csvSource, csvRegex));
+                processedOrder.setLine(Integer.valueOf(++counter).toString());
+                processedOrder.setStatus("");
+
+                return processedOrder;
+            }
+        };
+    }
+
+    @Bean
+    public ItemProcessor jsonItemProcessor() {
+        return new ItemProcessor<Order, ProcessedOrder>() {
+            int counter = 0;
+
+            @Override
+            public ProcessedOrder process(Order order) throws Exception {
+                ProcessedOrder processedOrder = new ProcessedOrder();
+
+                processedOrder.setOrderId(order.getOrderId());
+                processedOrder.setAmount(order.getAmount());
+                processedOrder.setCurrency(order.getCurrency());
+                processedOrder.setComment(order.getComment());
+                processedOrder.setFilename(extractFileName(jsonSource, jsonRegex));
+                processedOrder.setLine(Integer.valueOf(++counter).toString());
+                processedOrder.setStatus("");
+
+                return processedOrder;
+            }
+        };
+    }
+
+    @Bean
+    public ItemWriter<ProcessedOrder> orderItemWriter() {
         return items -> {
-            for (Order item : items) {
+            for (ProcessedOrder item : items) {
                 System.out.println(item.toString());
             }
         };
@@ -81,7 +151,6 @@ public class BatchConfiguration {
                 .split(new SimpleAsyncTaskExecutor())
                 .add(jsonFlow)
                 .end().build();
-
     }
 
     @Bean
@@ -89,6 +158,7 @@ public class BatchConfiguration {
         return stepBuilderFactory.get("csvStep")
                 .<Order, Order> chunk(10)
                 .reader(csvItemReader())
+                .processor(csvItemProcessor())
                 .writer(orderItemWriter())
                 .build();
     }
@@ -98,6 +168,7 @@ public class BatchConfiguration {
         return stepBuilderFactory.get("jsonStep")
                 .<Order, Order> chunk(10)
                 .reader(jsonItemReader())
+                .processor(jsonItemProcessor())
                 .writer(orderItemWriter())
                 .build();
     }
