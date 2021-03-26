@@ -41,8 +41,8 @@ public class BatchConfiguration {
     @Autowired
     public BeanFactory beanFactory;
 
-    private final String csvSource = "/data/input.csv";
-    private final String jsonSource = "/data/input.json";
+    private final String csvSource = "/data/orders.csv";
+    private final String jsonSource = "/data/orders.json";
     private final String csvRegex = "\\w+\\.csv";
     private final String jsonRegex = "\\w+\\.json";
 

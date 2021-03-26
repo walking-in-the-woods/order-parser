@@ -8,7 +8,7 @@ public class ProcessedOrder {
     private String comment;
     private String filename;
     private String line;
-    private String status;
+    private String result;
 
     public ProcessedOrder() {
     }
@@ -21,7 +21,7 @@ public class ProcessedOrder {
         this.comment = comment;
         this.filename = filename;
         this.line = line;
-        this.status = status;
+        this.result = status;
     }
 
     public String getOrderId() {
@@ -72,12 +72,12 @@ public class ProcessedOrder {
         this.line = line;
     }
 
-    public String getStatus() {
-        return status;
+    public String getResult() {
+        return result;
     }
 
-    public void setStatus(String status) {
-        this.status = status;
+    public void setResult(String result) {
+        this.result = result;
     }
 
     @Override
@@ -85,11 +85,10 @@ public class ProcessedOrder {
         return "{" +
                 "\"id\":" + orderId +
                 ", \"amount\":\"" + amount + "\"" +
-                ", \"currency\":\"" + currency + "\"" +
                 ", \"comment\":\"" + comment + "\"" +
                 ", \"filename\":\"" + filename + "\"" +
                 ", \"line=\":\"" + line + "\"" +
-                ", \"status\":\"" + status + "\"" +
+                ", \"result\":\"" + result + "\"" +
                 '}';
     }
 }

@@ -53,9 +53,9 @@ public class OrderItemProcessor implements ItemProcessor<Order, ProcessedOrder> 
         }
 
         if (checks[0] == "ID_OK" && checks[1] == "AMOUNT_OK" && checks[2] == "CURRENCY_OK") {
-            processedOrder.setStatus("OK");
+            processedOrder.setResult("OK");
         } else {
-            processedOrder.setStatus(checks[0] + ", " + checks[1] + ", " + checks[2]);
+            processedOrder.setResult(checks[0] + ", " + checks[1] + ", " + checks[2]);
         }
 
         return processedOrder;
