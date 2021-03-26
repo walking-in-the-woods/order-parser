@@ -8,8 +8,8 @@ public class OrderFieldSetMapper implements FieldSetMapper<Order> {
 
     @Override
     public Order mapFieldSet(FieldSet fieldSet) throws BindException {
-        return new Order(fieldSet.readLong("id"),
-                fieldSet.readDouble("amount"),
+        return new Order(fieldSet.readString("id"),
+                fieldSet.readString("amount"),
                 fieldSet.readString("currency"),
                 fieldSet.readString("comment"));
     }

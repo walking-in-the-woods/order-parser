@@ -2,6 +2,7 @@ package as.transactionparser.configuration;
 
 import as.transactionparser.domain.Order;
 import as.transactionparser.domain.OrderFieldSetMapper;
+import as.transactionparser.domain.OrderItemProcessor;
 import as.transactionparser.domain.ProcessedOrder;
 import org.springframework.batch.core.Job;
 import org.springframework.batch.core.Step;
@@ -10,7 +11,6 @@ import org.springframework.batch.core.configuration.annotation.JobBuilderFactory
 import org.springframework.batch.core.configuration.annotation.StepBuilderFactory;
 import org.springframework.batch.core.job.builder.FlowBuilder;
 import org.springframework.batch.core.job.flow.Flow;
-import org.springframework.batch.item.ItemProcessor;
 import org.springframework.batch.item.ItemWriter;
 import org.springframework.batch.item.file.FlatFileItemReader;
 import org.springframework.batch.item.file.mapping.DefaultLineMapper;
@@ -88,47 +88,13 @@ public class BatchConfiguration {
     }
 
     @Bean
-    public ItemProcessor csvItemProcessor() {
-        return new ItemProcessor<Order, ProcessedOrder>() {
-            int counter = 0;
-
-            @Override
-            public ProcessedOrder process(Order order) throws Exception {
-                ProcessedOrder processedOrder = new ProcessedOrder();
-
-                processedOrder.setOrderId(order.getOrderId());
-                processedOrder.setAmount(order.getAmount());
-                processedOrder.setCurrency(order.getCurrency());
-                processedOrder.setComment(order.getComment());
-                processedOrder.setFilename(extractFileName(csvSource, csvRegex));
-                processedOrder.setLine(Integer.valueOf(++counter).toString());
-                processedOrder.setStatus("");
-
-                return processedOrder;
-            }
-        };
+    public OrderItemProcessor csvItemProcessor() {
+        return new OrderItemProcessor(extractFileName(csvSource, csvRegex));
     }
 
     @Bean
-    public ItemProcessor jsonItemProcessor() {
-        return new ItemProcessor<Order, ProcessedOrder>() {
-            int counter = 0;
-
-            @Override
-            public ProcessedOrder process(Order order) throws Exception {
-                ProcessedOrder processedOrder = new ProcessedOrder();
-
-                processedOrder.setOrderId(order.getOrderId());
-                processedOrder.setAmount(order.getAmount());
-                processedOrder.setCurrency(order.getCurrency());
-                processedOrder.setComment(order.getComment());
-                processedOrder.setFilename(extractFileName(jsonSource, jsonRegex));
-                processedOrder.setLine(Integer.valueOf(++counter).toString());
-                processedOrder.setStatus("");
-
-                return processedOrder;
-            }
-        };
+    public OrderItemProcessor jsonItemProcessor() {
+        return new OrderItemProcessor(extractFileName(jsonSource, jsonRegex));
     }
 
     @Bean
@@ -156,9 +122,9 @@ public class BatchConfiguration {
     @Bean
     public Step csvStep() {
         return stepBuilderFactory.get("csvStep")
-                .<Order, Order> chunk(10)
+                .<Order, ProcessedOrder> chunk(10)
                 .reader(csvItemReader())
-                .processor(csvItemProcessor())
+                .processor(new OrderItemProcessor(extractFileName(csvSource, csvRegex)))
                 .writer(orderItemWriter())
                 .build();
     }
@@ -166,7 +132,7 @@ public class BatchConfiguration {
     @Bean
     public Step jsonStep() throws NoSuchMethodException {
         return stepBuilderFactory.get("jsonStep")
-                .<Order, Order> chunk(10)
+                .<Order, ProcessedOrder> chunk(10)
                 .reader(jsonItemReader())
                 .processor(jsonItemProcessor())
                 .writer(orderItemWriter())

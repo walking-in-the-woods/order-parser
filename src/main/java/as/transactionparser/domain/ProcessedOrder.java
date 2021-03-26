@@ -2,8 +2,8 @@ package as.transactionparser.domain;
 
 public class ProcessedOrder {
 
-    private Long orderId;
-    private Double amount;
+    private String orderId;
+    private String amount;
     private String currency;
     private String comment;
     private String filename;
@@ -12,7 +12,8 @@ public class ProcessedOrder {
 
     public ProcessedOrder() {
     }
-    public ProcessedOrder(Long orderId, Double amount, String currency, String comment,
+
+    public ProcessedOrder(String orderId, String amount, String currency, String comment,
                           String filename, String line, String status) {
         this.orderId = orderId;
         this.amount = amount;
@@ -23,19 +24,19 @@ public class ProcessedOrder {
         this.status = status;
     }
 
-    public Long getOrderId() {
+    public String getOrderId() {
         return orderId;
     }
 
-    public void setOrderId(Long orderId) {
+    public void setOrderId(String orderId) {
         this.orderId = orderId;
     }
 
-    public Double getAmount() {
+    public String getAmount() {
         return amount;
     }
 
-    public void setAmount(Double amount) {
+    public void setAmount(String amount) {
         this.amount = amount;
     }
 
