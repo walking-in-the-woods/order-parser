@@ -21,7 +21,7 @@ public class OrderItemProcessor implements ItemProcessor<Order, ProcessedOrder> 
             "CURRENCY_ERROR",
     };
 
-    int counter = 0;
+    int counter = 1;
 
     public OrderItemProcessor(String filename) {
         this.filename = filename;
